@@ -75,13 +75,12 @@ namespace CarWPFApp
         private string engineOffText = "Engine Off";
 
         // Message types
-        private string msgTypeEngineOff = "EngineOff";
-        //private const int msgTypeEngineOff = 1;
+        private const int msgTypeEngineOff = 1;
+        private int msgTypeDecelerateStop = 2;
 
-        // Message text
+        // Message texts
         private string msgEngineOff = "You cannot stop the engine, when valicity is not 0!";
-
-        
+        private string msgDecelerateStop = "Breaking is stopped, velicity is 0!";
 
         public MainWindow()
         {
@@ -137,27 +136,32 @@ namespace CarWPFApp
         }
 
         // Method to show MessageBox with content of different message type
-        private void ShowMessageBox(string messageType)
+        //private void ShowMessageBox(string messageType)
+        private void ShowMessageBox(int messageType)
         {
-            /*
             switch (messageType)
             {
                 case 1:
-
-            }*/
-
-            if (messageType == msgTypeEngineOff)
-            {
-                // Initialize the MessageBoxButton variables
-                MessageBoxButton button = MessageBoxButton.OK;
-                string caption = "Error Detected in Stop Engine";
-                // Display the MessageBox
-                MessageBox.Show(msgEngineOff, caption, button);
+                    // Initialize the MessageBoxButton variables
+                    MessageBoxButton button = MessageBoxButton.OK;
+                    string caption = "Error Detected in Stop Engine";
+                    // Display the MessageBox
+                    MessageBox.Show(msgEngineOff, caption, button);
+                    break;
+                case 2:
+                    // Initialize the MessageBoxButton variables
+                    button = MessageBoxButton.OK;
+                    caption = "Error Detected in Breaking";
+                    // Display the MessageBox
+                    MessageBox.Show(msgDecelerateStop, caption, button);
+                    break;
+                default:
+                    break;
             }
         }
 
         // Method to set timer
-        private void SetTimer(string timerType, Timer timer)
+        private void SetTimer(string timerType, ref Timer timer)
         {
             // Set a counter
             aCounter = 0;
@@ -168,8 +172,11 @@ namespace CarWPFApp
             if (timerType.Equals("accTimer"))
             {
                 // Hook up the Elapsed event for the timer
-                timer.Elapsed += new ElapsedEventHandler(EngineOnTimer_ElapsedEventHandler);
-                //timer.Elapsed += AccTimer_Elapsed; // jäi päälle + exception
+                timer.Elapsed += AccTimer_Elapsed; 
+            }
+            else if (timerType.Equals("decTimer"))
+            {
+                timer.Elapsed += DecTimer_Elapsed;
             }
             // Set timer's AutoReset and Enabled
             timer.AutoReset = true;
@@ -177,22 +184,10 @@ namespace CarWPFApp
         }
 
         // Method to stop timer
-        private void StopTimer(Timer timer)
+        private void StopTimer(ref Timer timer)
         {
             timer.Stop();
             timer.Dispose();
-        }
-
-        // Method to count and show velocity for Acceleration
-        private void EngineOnTimer_ElapsedEventHandler(object sender, ElapsedEventArgs e)
-        {
-            // Add counter for counting seconds
-            aCounter++;
-            // Count multiplication for velocity
-            velocity = constantAcceleration * aCounter * velocityVariantFromMeterPerSecondToKmPerHour;
-            // Show velocity
-            txtBoxVelocity.Text = velocity.ToString();
-
         }
 
         // Method to count and show velocity for Acceleration
@@ -201,9 +196,48 @@ namespace CarWPFApp
             // Add counter for counting seconds
             aCounter++;
             // Count multiplication for velocity
-            velocity = constantAcceleration * aCounter * velocityVariantFromMeterPerSecondToKmPerHour;
+            double result = constantAcceleration * aCounter * velocityVariantFromMeterPerSecondToKmPerHour;
+            velocity += result;
             // Show velocity
-            txtBoxVelocity.Text = velocity.ToString();
+            txtBoxVelocity.Dispatcher.Invoke(() =>
+            {
+                txtBoxVelocity.Text = velocity.ToString();
+            });
+            
+        }
+
+        // Method to count and show velocity for Deceleration
+        private void DecTimer_Elapsed(object sender, ElapsedEventArgs e)
+        {
+            if (velocity >= minVelocity)
+            {
+                // Add counter for counting seconds
+                aCounter++;
+                // Count multiplication for velocity
+                double result = constantAcceleration * aCounter * velocityVariantFromMeterPerSecondToKmPerHour;
+                velocity -= result;
+
+                // Show velocity
+                txtBoxVelocity.Dispatcher.Invoke(() =>
+                {
+                    txtBoxVelocity.Text = velocity.ToString();
+                });
+            }
+            else
+            {
+                // Stop timer
+                decTimer.Enabled = false;
+                StopTimer(ref decTimer);
+                // Show velocity
+                velocity = 0;
+                txtBoxVelocity.Dispatcher.Invoke(() =>
+                {
+                    txtBoxVelocity.Text = velocity.ToString();
+                });
+                // Inform user that velocity has reached 0.
+                ShowMessageBox(msgTypeDecelerateStop);
+            }
+            
         }
 
         private void btnEngineOn_Click(object sender, RoutedEventArgs e)
@@ -242,62 +276,121 @@ namespace CarWPFApp
             // Set the timer for counting velocity and showing it
             if (engineOn)
             {
-                SetTimer("accTimer", accTimer);
+                SetTimer("accTimer", ref accTimer);
             }
-        }
-
-        private void btnAccelerate_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
-        {
-            
-
-            // Set the timer for counting velocity and showing it
-            if (engineOn)
-            {
-                SetTimer("accTimer", accTimer);
-            }
-            
         }
 
         private void btnAccelerate_MouseUp(object sender, MouseButtonEventArgs e)
         {
             // Stop timer
-            StopTimer(accTimer);
+            StopTimer(ref accTimer);           
         }
 
+        private void btnDecelerate_MouseDown(object sender, MouseButtonEventArgs e)
+        {
+            // Set the timer for counting velocity and showing it
+            if (engineOn)
+            {
+                SetTimer("decTimer", ref decTimer);
+            }
+        }
+
+        private void btnDecelerate_MouseUp(object sender, MouseButtonEventArgs e)
+        {
+            // Stop timer
+            StopTimer(ref decTimer);
+        }
+
+        // TODO
+        private void btnTurnLeft_MouseDown(object sender, MouseButtonEventArgs e)
+        {
+            if (engineOn)
+            {
+                if (velocity > 0 && direction <= maxDirection)
+                {
+                    // Set timer
+                }
+
+            }
+        }
+        
+        // TODO
+        private void btnTurnLeft_MouseUp(object sender, MouseButtonEventArgs e)
+        {
+            // Stop timer
+        }
+        
+        // TODO
+        private void btnTurnRight_MouseDown(object sender, MouseButtonEventArgs e)
+        {
+            if (engineOn)
+            {
+                if (velocity > 0 && direction <= maxDirection)
+                {
+                    // Set timer
+                }
+
+            }
+        }
+
+        // TODO
+        private void btnTurnRight_MouseUp(object sender, MouseButtonEventArgs e)
+        {
+            // Stop timer
+        }
+
+        // TODO: not working???
+        private void btnAccelerate_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            // Set the timer for counting velocity and showing it
+            if (engineOn)
+            {
+                SetTimer("accTimer", ref accTimer);
+            }
+            
+        }
+
+        // TODO: not working???
         private void btnAccelerate_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
         {
             // Stop timer
-            StopTimer(accTimer);
+            StopTimer(ref accTimer);
         }
 
+        // TODO: not working???
         private void btnDecelerate_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
         {
-
+            // Set the timer for counting velocity and showing it
+            if (engineOn)
+            {
+                SetTimer("decTimer", ref decTimer);
+            }
         }
-
+        // TODO: not working???
         private void btnDecelerate_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
         {
 
         }
-
+        // TODO: not working???
         private void btnTurnLeft_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
         {
 
         }
-
+        // TODO: not working???
         private void btnTurnLeft_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
         {
 
         }
-
+        // TODO: not working???
         private void btnTurnRight_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
         {
 
         }
-
+        // TODO: not working???
         private void btnTurnRight_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
         {
 
         }
+
     }
 }
